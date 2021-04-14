@@ -3,4 +3,7 @@
 
   <node name="flappy_automation_code" pkg="flappy_automation_code" type="flappy_automation_code_node" output="screen" />
   <node name="flappy_main_game" pkg="flappy_main_game" type="flappy.py" output="screen" />
+  <node name="world_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map world 100"/>
+  <node name="laser_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map laser_frame 100"/>
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find flappy_automation_code)/rviz/config.rviz"/>
 </launch>

@@ -5,8 +5,8 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /LaserScan1
-        - /PointCloud1
+        - /Polygon2
+        - /Polygon2/Status1
       Splitter Ratio: 0.5
     Tree Height: 728
   - Class: rviz/Selection
@@ -112,6 +112,22 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: false
+      Value: true
+    - Alpha: 1
+      Class: rviz/Polygon
+      Color: 25; 255; 0
+      Enabled: true
+      Name: Polygon
+      Topic: /flappy_gate_upper
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Class: rviz/Polygon
+      Color: 25; 255; 0
+      Enabled: true
+      Name: Polygon
+      Topic: /flappy_gate_lower
+      Unreliable: false
       Value: true
   Enabled: true
   Global Options:

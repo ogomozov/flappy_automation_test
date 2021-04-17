@@ -1,10 +1,12 @@
 #pragma once
 #include "ros/ros.h"
+#include "Common.hpp"
+#include "SimplePerception.hpp"
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/Vector3.h>
 #include <sensor_msgs/PointCloud.h>
 #include <deque>
-
+#include <flappy_automation_code/SimplePerception.hpp>
 
 enum struct ControllerState{
     IDLE,
@@ -15,21 +17,12 @@ enum struct ControllerState{
 
 
 struct SpeedLimit{
+    double x_limit;
+    double y_up_limit;
+    double y_down_limit;
     double vx;
     double vy_up;
     double vy_down;
-};
-
-
-struct PipeGap{
-    PipeGap(double lower_extent, double upper_extent) :
-        m_lower_extent{lower_extent},
-        m_upper_extent{upper_extent},
-        m_middle{0.5*(lower_extent + upper_extent)}
-    {}
-    double m_lower_extent;
-    double m_upper_extent;
-    double m_middle;
 };
 
 
@@ -84,34 +77,16 @@ private:
     // TODO move to ros node parameters.
     static constexpr auto m_dist_threshold = 0.05;
     static constexpr auto m_slow_speed = 0.5;
-    static constexpr auto m_margin_y = 0.2;
-    static constexpr auto m_margin_x = 0.25;
-    static constexpr auto m_nom_acc = 2.0;
-    static constexpr auto m_max_acc = 3.0;
-    static constexpr auto m_max_view_distance= 1.5;
-
-    // Computed parameters. Filled in on the construction.
-    double m_v_max_x{0};
-    double m_v_max_y{0};
+    static constexpr auto m_margin_y = 0.22;
+    static constexpr auto m_margin_x = 0.3;
+    static constexpr auto m_nom_acc = 0.35;
+    static constexpr auto m_max_acc = 1.5;
+    static constexpr auto m_max_view_distance = 1.5;
+    static constexpr auto m_max_speed = 1.0;
 
     /*============== State variables ==============*/
     // State of the controller.
     ControllerState m_state{ControllerState::IDLE};
-
-    // Detection flags.
-    bool m_floor_detected{false};
-    bool m_ceiling_detected{false};
-    bool m_pipe_detected{false};
-
-    // Perceived values.
-    double m_floor_offset{-2.0};
-    double m_ceiling_offset{2.0};
-    double m_pipe_start{0.0};
-    double m_pipe_end{0.0};
-    double m_pipe_next_start{m_max_view_distance};
-    double m_pipe_gap_start{0.0};
-    double m_pipe_gap_end{0.0};
-    std::deque<geometry_msgs::Point32> m_points_x_sorted{};
 
     // Measured speed
     geometry_msgs::Vector3 m_current_speed{};
@@ -122,9 +97,11 @@ private:
     double m_delta_sec_avg{1.0/30.0};
 
 
+    SimplePerception m_perception;
+
     /*============== Methods ==============*/
-    // Resets the detection flags and flushes the point cloud.
-    void resetState();
+
+    static constexpr NodeParams initParams();
 
     // Changes the state of the controller and perceived variables
     // due to perception and position change of the bird.
@@ -139,36 +116,13 @@ private:
     // and the perception.
     void publishCommand(double delta_sec);
 
-    // Shifts the point cloud, floor and ceilling detected offsets by
-    // dx and dy. Removes the points that are pas our half size for the
-    // point cloud.
-    void updatePerception(double dx, double dy);
-
-    // Gets speed limits as a function of the current perception.
-    SpeedLimit getSpeedLimit();
+    // Gets the position at wich we want to stop due to
+    // gate tracking and anitcollision.
+    Vector2d getTargetPos() const;
 
     // Returns maximum speed from which we can stop at distance with
     // m_nom_acc deceleration.
     double maxSpeedFromDistance(double distance);
-
-    // Checks that a similar point is already in the point cloud.
-    bool isSimilarPointInCloud(const geometry_msgs::Point32& p);
-
-    // Checks that the point belongs to the detected floor or the ceiling.
-    bool isPointGroundOrCeiling(const geometry_msgs::Point32& p);
-
-    // Try to detect the pipe. If successful sets the m_pipe_detected flag
-    // to true, updates the perceived values and returns true.
-    bool detectPipe();
-
-    // Try to detect the floor. If successful sets the m_floor_detected flag
-    // to true, updates the perceived values and returns true.
-    bool detectFloor();
-
-    // Try to detect the ceiling. If successful sets the m_ceiling_detected flag
-    // to true, updates the perceived values and returns true.
-    bool detectCeiling();
-
 
     /*============== Callbacks ==============*/
     // Callback on the velocity update. The main callback where the

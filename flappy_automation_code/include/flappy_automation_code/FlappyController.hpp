@@ -48,7 +48,7 @@ struct SpeedLimit{
  * the closest obstacle minus bird's half size and some security margin.
  *
  * To detect pipes a point cloud is accumulated from the laser scan. Then a simple AABB
- * clastering is done and clustered points are sorted along y-axis. Two consecutive
+ * clustering is done and clustered points are sorted along y-axis. Two consecutive
  * points with y-distance larger than the bird size plus some security margin are
  * considered a potential gap. The candidate closest to the bird position along
  * y-axis is chosen as the detected gap.
@@ -71,7 +71,6 @@ private:
     ros::Publisher m_pub_second_gate_upper;
     ros::Publisher m_pub_second_gate_lower;
     ros::Publisher m_pub_path;
-    ros::NodeHandlePtr m_handle_ptr;
 
     /* Timer to check the timeouts on speed and laser scan readings. */
     ros::Timer timeout_check_timer;
@@ -79,16 +78,7 @@ private:
     ros::Time m_prev_speed_update_time;
 
     /*============== Parameters ==============*/
-    //  Static parameters.
-    // TODO move to ros node parameters.
-    static constexpr auto m_dist_threshold = 0.05;
-    static constexpr auto m_slow_speed = 0.5;
-    static constexpr auto m_margin_y = 0.22;
-    static constexpr auto m_margin_x = 0.3;
-    static constexpr auto m_nom_acc = 2.5;
-    static constexpr auto m_max_acc = 3.0;
-    static constexpr auto m_max_view_distance = 5.0;
-    static constexpr auto m_max_speed = 2.5;
+    NodeParams m_params;
 
     /*============== State variables ==============*/
     // State of the controller.
@@ -99,7 +89,6 @@ private:
     geometry_msgs::Vector3 m_prev_speed{};
 
     // Measured time step
-    // TODO add actual measurment to the velCallback
     double m_delta_sec_avg{1.0/30.0};
 
     PathPlanner m_path_planner;
@@ -107,7 +96,7 @@ private:
 
     /*============== Methods ==============*/
 
-    static constexpr NodeParams initParams();
+    NodeParams initParams(ros::NodeHandlePtr node_handle) const;
 
     // Changes the state of the controller and perceived variables
     // due to perception and position change of the bird.

@@ -128,7 +128,7 @@ void SimplePerception::detectPipes(){
             }
             m_pipes.emplace_back(detectPipe(pipe_start, it, gap_guess));
             const auto& new_pipe = m_pipes.back();
-            gap_guess = 0.5 * (new_pipe.m_gap_start + m_pipe_gap_end);
+            gap_guess = 0.5 * (new_pipe.m_gap_start + new_pipe.m_gap_end);
             pipe_start = it;
         }
     }

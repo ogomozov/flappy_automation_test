@@ -1,6 +1,8 @@
 #pragma once
 #include <flappy_automation_code/Common.hpp>
 
+
+// 2D Hermite spline of order 3
 class Hermite3{
 public:
 
@@ -35,6 +37,8 @@ public:
     }
 
 private:
+
+    /*====== Curve coefficients ======*/
     Vector2d m_a0;
     Vector2d m_a1;
     Vector2d m_a2;

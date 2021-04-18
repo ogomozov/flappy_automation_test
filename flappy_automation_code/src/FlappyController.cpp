@@ -20,11 +20,11 @@ FlappyController::FlappyController(ros::NodeHandlePtr h) :
     m_pub_second_gate_upper{h->advertise<geometry_msgs::PolygonStamped>("/flappy_second_gate_upper", 1)},
     m_pub_second_gate_lower{h->advertise<geometry_msgs::PolygonStamped>("/flappy_second_gate_lower", 1)},
     m_pub_path{h->advertise<nav_msgs::Path>("/flappy_path", 1)},
-    m_path_planner(initParams()),
-    m_perception{initParams()},
-    m_handle_ptr{std::move(h)}
+    m_params{initParams(h)},
+    m_path_planner(m_params),
+    m_perception{m_params}
 {
-    timeout_check_timer = m_handle_ptr->createTimer(
+    timeout_check_timer = h->createTimer(
         ros::Duration(0.1),
         &FlappyController::checkTimeouts,
         this,
@@ -92,7 +92,7 @@ void FlappyController::checkTimeouts(const ros::TimerEvent& e){
 }
 
 double FlappyController::maxSpeedFromDistance(double distance){
-    const auto v_sq = std::max(0.0, 2.0 * m_nom_acc * distance);
+    const auto v_sq = std::max(0.0, 2.0 * m_params.m_nom_acc * distance);
     return std::sqrt(v_sq);
 }
 
@@ -205,8 +205,8 @@ void FlappyController::publishVisuals() {
     path_msg.header.frame_id = "world";
     std::transform(path.begin(), path.end(), std::back_inserter(path_msg.poses), [](const auto& p){
         auto pose_msg = geometry_msgs::PoseStamped{};
-        pose_msg.pose.position.x = p.x;
-        pose_msg.pose.position.y = p.y;
+        pose_msg.pose.position.x = p.m_pos.x;
+        pose_msg.pose.position.y = p.m_pos.y;
         return pose_msg;
     });
     m_pub_path.publish(path_msg);
@@ -218,69 +218,62 @@ void FlappyController::publishCommand(double delta_sec){
     auto speedWanted = Vector2d{0.0, 0.0};
     if (m_state == ControllerState::FIND_FLOOR) {
         speedWanted.x = 0.0;
-        speedWanted.y = -m_slow_speed;
+        speedWanted.y = -m_params.m_slow_speed;
     } else if (m_state == ControllerState::FIND_CEILING){
         speedWanted.x = 0.0;
-        speedWanted.y = m_slow_speed;
+        speedWanted.y = m_params.m_slow_speed;
     } else if (m_state == ControllerState::NAVIGATE){
         const auto target_pos = getTargetPos();
-        speedWanted.x = std::min(m_max_speed, maxSpeedFromDistance(target_pos.x));
-        speedWanted.y = std::min(m_max_speed, maxSpeedFromDistance(std::fabs(target_pos.y)));
+        speedWanted.x = std::min(m_params.m_max_speed, maxSpeedFromDistance(target_pos.x));
+        speedWanted.y = std::min(m_params.m_max_speed, maxSpeedFromDistance(std::fabs(target_pos.y)));
         speedWanted.y = (target_pos.y > 0)? speedWanted.y : -speedWanted.y;
     }
 
     geometry_msgs::Vector3 acc_cmd;
     acc_cmd.x = (speedWanted.x - m_current_speed.x) / m_delta_sec_avg;
     acc_cmd.y = (speedWanted.y - m_current_speed.y) / m_delta_sec_avg;
-    acc_cmd.x = std::clamp(acc_cmd.x, -m_max_acc, m_max_acc);
-    acc_cmd.y = std::clamp(acc_cmd.y, -m_max_acc, m_max_acc);
+    acc_cmd.x = std::clamp(acc_cmd.x, -m_params.m_max_acc, m_params.m_max_acc);
+    acc_cmd.y = std::clamp(acc_cmd.y, -m_params.m_max_acc, m_params.m_max_acc);
     m_pub_acc_cmd.publish(acc_cmd);
-
-    const auto planner = PathPlanner(initParams());
-    const auto current_speed = Vector2d{
-        m_current_speed.x,
-        m_current_speed.y
-    };
-
-
 }
 
-constexpr NodeParams FlappyController::initParams(){
-    return NodeParams{
-        m_dist_threshold,
-        m_slow_speed,
-        m_margin_y,
-        m_margin_x,
-        m_nom_acc,
-        m_max_acc,
-        m_max_view_distance
-    };
+NodeParams FlappyController::initParams(ros::NodeHandlePtr node_handle) const {
+    auto res = NodeParams{};
+    node_handle->getParam("/dist_threshold", res.m_dist_threshold);
+    node_handle->getParam("/slow_speed", res.m_slow_speed);
+    node_handle->getParam("/margin_y", res.m_margin_y);
+    node_handle->getParam("/margin_x", res.m_margin_x);
+    node_handle->getParam("/nom_acc", res.m_nom_acc);
+    node_handle->getParam("/max_acc", res.m_max_acc);
+    node_handle->getParam("/max_view_distance", res.m_max_view_distance);
+    node_handle->getParam("/max_speed", res.m_max_speed);
+    return res;
 }
 
 Vector2d FlappyController::getTargetPos() const {
     auto res = Vector2d{
-        m_max_view_distance,
+            m_params.m_max_view_distance,
         0.0
     };
 
     const auto& pipes = m_perception.getDetectedPipes();
     if (not pipes.empty()){
         const auto& pipe = pipes.front();
-        auto relative_pos = pipe.getRelativePosition(m_margin_x);
-        if ( relative_pos == RelativePosition::Before and not pipe.isAlignedWithGap(m_margin_y)){
-            res.x = std::min(res.x, pipe.m_start - m_margin_x);
+        auto relative_pos = pipe.getRelativePosition(m_params.m_margin_x);
+        if ( relative_pos == RelativePosition::Before and not pipe.isAlignedWithGap(m_params.m_margin_y)){
+            res.x = std::min(res.x, pipe.m_start - m_params.m_margin_x);
         }
         if (relative_pos != RelativePosition::After){
             res.y = (pipe.m_gap_start + pipe.m_gap_end) * 0.5;
         }
-        if (relative_pos == RelativePosition::Inside and not pipe.isAlignedWithGap(m_margin_y)) {
+        if (relative_pos == RelativePosition::Inside and not pipe.isAlignedWithGap(m_params.m_margin_y)) {
             res.x = 0.0;
         }
     }
 
     auto next_pipe_start =  m_perception.getNextPipeStart() ;
     if (next_pipe_start.has_value())
-        res.x = std::min(res.x, *next_pipe_start - m_margin_x);
+        res.x = std::min(res.x, *next_pipe_start - m_params.m_margin_x);
 
     return res;
 }

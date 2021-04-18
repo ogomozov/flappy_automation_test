@@ -6,4 +6,15 @@
   <node name="world_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map world 100"/>
   <node name="laser_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map laser_frame 100"/>
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find flappy_automation_code)/rviz/config.rviz"/>
+
+  <param name="dist_threshold" type="double" value="0.05" />
+  <param name="slow_speed" type="double" value="0.5" />
+  <param name="margin_y" type="double" value="0.22" />
+  <param name="margin_x" type="double" value="0.3" />
+  <param name="nom_acc" type="double" value="2.5" />
+  <param name="max_acc" type="double" value="3.0" />
+  <param name="max_view_distance" type="double" value="3.5" />
+  <param name="max_speed" type="double" value="1.5" />
+
+
 </launch>

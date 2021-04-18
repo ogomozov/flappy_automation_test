@@ -4,23 +4,44 @@
 #include <optional>
 #include <vector>
 
-
+/*
+ * Simple perception based.
+ * Accumulates the point cloud from laser readings and try to
+ * cluster the points into AABBs that represent the pipes
+ * in the game.
+ */
 class SimplePerception{
 public:
 
     explicit SimplePerception(const NodeParams& params);
 
+    // Resets the point cloud, floor and ceiling offsets and the detected pipes.
     void reset();
 
+    // Returns reference to an array of pipes sorted by x offset from the bird.
     const std::vector<Pipe>& getDetectedPipes() const;
+
+    // Returns the start of the pipe next to the one that the bird is currently passing.
     std::optional<double> getNextPipeStart() const;
+
+    // If floor is detected returns its offset.
     std::optional<double> getFloorOffset() const;
+
+    // If the ceiling is detected returns its offset.
     std::optional<double> getCeilingOffset() const;
+
+    // Returns a container with the points sorted by x offset from the bird.
     const std::deque<Vector2d>& getPoints() const;
 
+    // Addes the points to the cloud.
     void addPoints(const std::vector<Vector2d>& new_points);
+
+    // Shift the detected points, gates and offsets according to the delta shift of the bird.
     void shift(const Vector2d& delta);
+
+    // Clear the point cloud and reset detected pipes.
     void clearPoints();
+
 private:
 
     NodeParams m_params;
@@ -34,11 +55,6 @@ private:
     // Perceived values.
     double m_floor_offset{0};
     double m_ceiling_offset{0};
-    double m_pipe_start{0};
-    double m_pipe_end{0};
-    double m_pipe_next_start{0};
-    double m_pipe_gap_start{0};
-    double m_pipe_gap_end{0};
     std::deque<Vector2d> m_points_x_sorted{};
     std::vector<Pipe> m_pipes;
 
@@ -61,6 +77,8 @@ private:
     // to true, updates the perceived values and returns true.
     bool detectCeiling();
 
+    // Detect and construct a single pipe from the point ranging from start to end
+    // with a hint on the pipes gap vertical offset.
     using Iterator = typename std::deque<Vector2d>::iterator;
     Pipe detectPipe(Iterator start, Iterator end, double gap_guess);
 

@@ -11,6 +11,7 @@ constexpr T pow2(T v) {
 
 struct Vector2d{
     constexpr Vector2d(double _x, double _y) : x{_x}, y{_y} {}
+    constexpr Vector2d() : Vector2d{0.0, 0.0} {}
     double x;
     double y;
 };
@@ -51,6 +52,7 @@ struct NodeParams{
     double m_nom_acc;
     double m_max_acc;
     double m_max_view_distance;
+    double m_max_speed;
 };
 
 struct PipeGap{
@@ -92,10 +94,6 @@ struct Pipe{
     bool isPassingPipe(double margin_x) const {
         assert(margin_x >= 0);
         return margin_x > m_start and -margin_x < m_end;
-    }
-
-    bool isCollidingWithPipe(const Vector2d& margins) const {
-        return isPassingPipe(margins.x) and not isAlignedWithGap(margins.y);
     }
 
     RelativePosition getRelativePosition(double margin_x) const {

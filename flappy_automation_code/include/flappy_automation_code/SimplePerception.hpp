@@ -1,9 +1,8 @@
 #pragma once
 #include <flappy_automation_code/Common.hpp>
 #include <deque>
-#include <iterator>
 #include <optional>
-#include <boost/numeric/ublas/vector.hpp>
+#include <vector>
 
 
 class SimplePerception{

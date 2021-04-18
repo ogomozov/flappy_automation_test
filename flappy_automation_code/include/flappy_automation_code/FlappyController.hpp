@@ -1,12 +1,15 @@
 #pragma once
-#include "ros/ros.h"
-#include "Common.hpp"
-#include "SimplePerception.hpp"
+
+#include <flappy_automation_code/Common.hpp>
+#include <flappy_automation_code/SimplePerception.hpp>
+#include <flappy_automation_code/PathPlanner.hpp>
+
+#include <ros/ros.h>
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/Vector3.h>
 #include <sensor_msgs/PointCloud.h>
 #include <deque>
-#include <flappy_automation_code/SimplePerception.hpp>
+
 
 enum struct ControllerState{
     IDLE,
@@ -84,7 +87,7 @@ private:
     static constexpr auto m_margin_x = 0.3;
     static constexpr auto m_nom_acc = 2.5;
     static constexpr auto m_max_acc = 3.0;
-    static constexpr auto m_max_view_distance = 1.5;
+    static constexpr auto m_max_view_distance = 5.0;
     static constexpr auto m_max_speed = 2.5;
 
     /*============== State variables ==============*/
@@ -99,7 +102,7 @@ private:
     // TODO add actual measurment to the velCallback
     double m_delta_sec_avg{1.0/30.0};
 
-
+    PathPlanner m_path_planner;
     SimplePerception m_perception;
 
     /*============== Methods ==============*/

@@ -1,7 +1,16 @@
 #pragma once
+
 #include <cassert>
+#include <cmath>
+
+
+template<typename T>
+constexpr T pow2(T v) {
+    return v * v;
+}
 
 struct Vector2d{
+    constexpr Vector2d(double _x, double _y) : x{_x}, y{_y} {}
     double x;
     double y;
 };
@@ -30,6 +39,9 @@ constexpr Vector2d operator*(double scalar, const Vector2d& vector) {
 constexpr Vector2d operator*(const Vector2d& vector, double scalar) {
     return scalar * vector;
 }
+
+double len(const Vector2d &v);
+Vector2d normalized(const Vector2d& v);
 
 struct NodeParams{
     double m_dist_threshold;
@@ -100,8 +112,3 @@ struct Pipe{
     double m_gap_start{0};
     double m_gap_end{0};
 };
-
-template<typename T>
-constexpr T pow2(T v) {
-    return v * v;
-}

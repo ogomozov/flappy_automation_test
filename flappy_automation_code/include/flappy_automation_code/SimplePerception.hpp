@@ -13,7 +13,7 @@ public:
 
     void reset();
 
-    std::optional<Pipe> getFistPipe() const;
+    const std::vector<Pipe>& getDetectedPipes() const;
     std::optional<double> getNextPipeStart() const;
     std::optional<double> getFloorOffset() const;
     std::optional<double> getCeilingOffset() const;
@@ -31,7 +31,6 @@ private:
     // Detection flags
     bool m_floor_detected{false};
     bool m_ceiling_detected{false};
-    bool m_pipe_detected{false};
 
     // Perceived values.
     double m_floor_offset{0};
@@ -42,6 +41,7 @@ private:
     double m_pipe_gap_start{0};
     double m_pipe_gap_end{0};
     std::deque<Vector2d> m_points_x_sorted{};
+    std::vector<Pipe> m_pipes;
 
     /*============= Methods =============*/
 
@@ -51,9 +51,8 @@ private:
     // Checks that the point belongs to the detected floor or the ceiling.
     bool isPointGroundOrCeiling(const Vector2d& p);
 
-    // Try to detect the pipe. If successful sets the m_pipe_detected flag
-    // to true, updates the perceived values and returns true.
-    bool detectPipe();
+    // Try to detect the pipes.
+    void detectPipes();
 
     // Try to detect the floor. If successful sets the m_floor_detected flag
     // to true, updates the perceived values and returns true.
@@ -62,5 +61,8 @@ private:
     // Try to detect the ceiling. If successful sets the m_ceiling_detected flag
     // to true, updates the perceived values and returns true.
     bool detectCeiling();
+
+    using Iterator = typename std::deque<Vector2d>::iterator;
+    Pipe detectPipe(Iterator start, Iterator end, double gap_guess);
 
 };

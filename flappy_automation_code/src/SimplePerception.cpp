@@ -3,36 +3,35 @@
 #include <vector>
 #include <cmath>
 
+
 SimplePerception::SimplePerception(const NodeParams& params) : m_params{params}{
 }
+
 
 void SimplePerception::reset() {
     m_floor_detected = false;
     m_ceiling_detected = false;
-    m_pipe_detected = false;
+    m_pipes.clear();
     clearPoints();
 }
+
 
 void SimplePerception::clearPoints() {
     m_points_x_sorted.clear();
 }
 
-std::optional<Pipe> SimplePerception::getFistPipe() const {
-    if (not m_pipe_detected)
-        return std::nullopt;
-    return Pipe{
-        m_pipe_start,
-        m_pipe_end,
-        m_pipe_gap_start,
-        m_pipe_gap_end
-    };
+
+const std::vector<Pipe>& SimplePerception::getDetectedPipes() const {
+    return m_pipes;
 }
 
+
 std::optional<double> SimplePerception::getNextPipeStart() const {
-    if (m_pipe_detected)
-        return m_pipe_next_start;
-    return m_params.m_max_view_distance;
+    if (m_pipes.size()<2)
+        return m_params.m_max_view_distance;
+    return m_pipes[1].m_start;
 }
+
 
 std::optional<double> SimplePerception::getFloorOffset() const {
     if (m_floor_detected)
@@ -40,18 +39,15 @@ std::optional<double> SimplePerception::getFloorOffset() const {
     return std::nullopt;
 }
 
+
 std::optional<double> SimplePerception::getCeilingOffset() const {
     if (m_ceiling_detected)
         return m_ceiling_offset;
     return std::nullopt;
 }
 
-/*
-template<typename ConstIter>
-void SimplePerception::addPoints(ConstIter it_begin, ConstIter it_end){
- */
+
 void SimplePerception::addPoints(const std::vector<Vector2d> &new_points) {
-    // TODO check if ConstIter is actually iterator to Vector2d
     auto it_begin = new_points.begin();
     auto it_end = new_points.end();
     std::copy_if(it_begin, it_end, std::back_inserter(m_points_x_sorted), [this](const auto& p){
@@ -66,7 +62,7 @@ void SimplePerception::addPoints(const std::vector<Vector2d> &new_points) {
     if (not m_ceiling_detected)
         detectCeiling();
     if (m_floor_detected and m_ceiling_detected)
-        detectPipe();
+        detectPipes();
 }
 
 
@@ -84,7 +80,7 @@ void SimplePerception::shift(const Vector2d& delta){
     while((not m_points_x_sorted.empty() and m_points_x_sorted.front().x < - 2 * m_params.m_margin_x))
         m_points_x_sorted.pop_front();
 
-    detectPipe();
+    detectPipes();
 }
 
 
@@ -108,33 +104,47 @@ bool SimplePerception::isPointGroundOrCeiling(const Vector2d& p) {
     return false;
 }
 
-bool SimplePerception::detectPipe(){
-    m_pipe_detected = false;
+
+void SimplePerception::detectPipes(){
+    m_pipes.clear();
     if (not (m_floor_detected and m_ceiling_detected))
-        return false;
+        return;
     if (m_points_x_sorted.size() < 2)
-        return false;
+        return;
 
     auto pipe_start = m_points_x_sorted.begin();
     auto pipe_end = m_points_x_sorted.end();
-    for (auto it = std::next(pipe_start); it != m_points_x_sorted.end(); ++it){
+    auto last_point = std::prev(m_points_x_sorted.end());
+    auto gap_guess = 0.0;
+    for (auto it = pipe_start; it != m_points_x_sorted.end(); ++it) {
+        if (it == pipe_start)
+            continue;
         const auto dist = it->x - std::prev(it)->x;
-        if (dist > m_params.m_margin_x*2){
+        if (it == last_point or dist > m_params.m_margin_x*2){
+            // Don't add pipes that we've already passed
             if (it->x + m_params.m_margin_x < 0){
                 pipe_start = it;
                 continue;
             }
-            pipe_end = it;
-            break;
+            m_pipes.emplace_back(detectPipe(pipe_start, it, gap_guess));
+            const auto& new_pipe = m_pipes.back();
+            gap_guess = 0.5 * (new_pipe.m_gap_start + m_pipe_gap_end);
+            pipe_start = it;
         }
     }
-    m_pipe_start = pipe_start->x;
-    m_pipe_end = std::prev(pipe_end)->x;
-    m_pipe_next_start = (pipe_end != m_points_x_sorted.end())? pipe_end->x : m_params.m_max_view_distance;
+}
+
+
+Pipe SimplePerception::detectPipe(Iterator start, Iterator end, double gap_guess){
+    auto res = Pipe{};
+    res.m_start = start->x;
+    res.m_end = std::prev(end)->x;
+    if (std::distance(start, end) < 2)
+        return res;
 
     auto offsets = std::vector<double>{};
-    offsets.reserve(std::distance(pipe_start, pipe_end));
-    std::transform(pipe_start, pipe_end, std::back_inserter(offsets), [](const auto& p){
+    offsets.reserve(std::distance(start, end));
+    std::transform(start, end, std::back_inserter(offsets), [](const auto& p){
         return p.y;
     });
     offsets.emplace_back(m_ceiling_offset);
@@ -148,19 +158,17 @@ bool SimplePerception::detectPipe(){
         }
     }
     if (gaps.empty()){
-        m_pipe_gap_start = 0.0;
-        m_pipe_gap_end = 0.0;
-        m_pipe_detected = true;
-        return true;
+        res.m_gap_start = 0.0;
+        res.m_gap_end = 0.0;
     }
-    const auto it = std::min_element(gaps.begin(), gaps.end(), [](const auto& a, const auto& b){
-        return std::fabs(a.m_middle) < std::fabs(b.m_middle);
+    const auto it = std::min_element(gaps.begin(), gaps.end(), [&](const auto& a, const auto& b){
+        return std::fabs(a.m_middle - gap_guess) < std::fabs(b.m_middle - gap_guess);
     });
-    m_pipe_gap_start = it->m_lower_extent;
-    m_pipe_gap_end = it->m_upper_extent;
-    m_pipe_detected = true;
-    return true;
+    res.m_gap_start = it->m_lower_extent;
+    res.m_gap_end = it->m_upper_extent;
+    return res;
 }
+
 
 bool SimplePerception::detectFloor(){
     const auto it = std::min_element(
@@ -179,6 +187,7 @@ bool SimplePerception::detectFloor(){
     return m_floor_detected;
 }
 
+
 bool SimplePerception::detectCeiling(){
     const auto it = std::max_element(
             m_points_x_sorted.begin(),
@@ -195,6 +204,7 @@ bool SimplePerception::detectCeiling(){
     }
     return m_ceiling_detected;
 }
+
 
 const std::deque<Vector2d>& SimplePerception::getPoints() const {
     return m_points_x_sorted;

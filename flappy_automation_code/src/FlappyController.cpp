@@ -13,8 +13,10 @@ FlappyController::FlappyController(ros::NodeHandlePtr h) :
       h->advertise<geometry_msgs::Vector3>("/flappy_acc", 1)},
     m_pub_point_cloud{
       h->advertise<sensor_msgs::PointCloud>("/flappy_point_cloud", 1)},
-    m_pub_gate_upper{h->advertise<geometry_msgs::PolygonStamped>("/flappy_gate_upper", 1)},
-    m_pub_gate_lower{h->advertise<geometry_msgs::PolygonStamped>("/flappy_gate_lower", 1)},
+    m_pub_first_gate_upper{h->advertise<geometry_msgs::PolygonStamped>("/flappy_first_gate_upper", 1)},
+    m_pub_first_gate_lower{h->advertise<geometry_msgs::PolygonStamped>("/flappy_first_gate_lower", 1)},
+    m_pub_second_gate_upper{h->advertise<geometry_msgs::PolygonStamped>("/flappy_second_gate_upper", 1)},
+    m_pub_second_gate_lower{h->advertise<geometry_msgs::PolygonStamped>("/flappy_second_gate_lower", 1)},
     m_pub_path{h->advertise<nav_msgs::Path>("/flappy_path", 1)},
     m_perception{initParams()},
     m_handle_ptr{std::move(h)}
@@ -113,43 +115,64 @@ void FlappyController::updateState(double delta_sec){
 }
 
 void FlappyController::publishVisuals() {
-    geometry_msgs::PolygonStamped upper_poly_msg;
-    upper_poly_msg.header.frame_id = "world";
-    geometry_msgs::PolygonStamped lower_poly_msg;
-    lower_poly_msg.header.frame_id = "world";
 
-    const auto pipe = m_perception.getFistPipe();
+
     const auto floor_offset = m_perception.getFloorOffset();
     const auto ceiling_offset = m_perception.getCeilingOffset();
+    if (floor_offset.has_value() and ceiling_offset.has_value()){
 
-    if (pipe.has_value() and floor_offset.has_value() and ceiling_offset.has_value()){
-        {
-            auto& points = upper_poly_msg.polygon.points;
-            points.resize(4);
-            points[0].x = (*pipe).m_end;
-            points[0].y = *ceiling_offset;
-            points[1].x = (*pipe).m_start;
-            points[1].y = *ceiling_offset;
-            points[2].x = (*pipe).m_start;
-            points[2].y = (*pipe).m_gap_end;
-            points[3].x = (*pipe).m_end;
-            points[3].y = (*pipe).m_gap_end;
+        const auto publish_pipe_polygons = [&](const auto& pipe, auto& upper_pub, auto& lower_pub){
+            geometry_msgs::PolygonStamped upper_poly_msg;
+            upper_poly_msg.header.frame_id = "world";
+            geometry_msgs::PolygonStamped lower_poly_msg;
+            lower_poly_msg.header.frame_id = "world";
+            {
+                auto& points = upper_poly_msg.polygon.points;
+                points.resize(4);
+                points[0].x = pipe.m_end;
+                points[0].y = *ceiling_offset;
+                points[1].x = pipe.m_start;
+                points[1].y = *ceiling_offset;
+                points[2].x = pipe.m_start;
+                points[2].y = pipe.m_gap_end;
+                points[3].x = pipe.m_end;
+                points[3].y = pipe.m_gap_end;
+            }
+            {
+                auto &points = lower_poly_msg.polygon.points;
+                points.resize(4);
+                points[0].x = pipe.m_end;
+                points[0].y = pipe.m_gap_start;
+                points[1].x = pipe.m_start;
+                points[1].y = pipe.m_gap_start;
+                points[2].x = pipe.m_start;
+                points[2].y = *floor_offset;
+                points[3].x = pipe.m_end;
+                points[3].y = *floor_offset;
+            }
+            upper_pub.publish(upper_poly_msg);
+            lower_pub.publish(lower_poly_msg);
+        };
+
+        const auto publish_empty_polygons = [](auto& upper_pub, auto& lower_pub){
+            geometry_msgs::PolygonStamped empty_poly;
+            empty_poly.header.frame_id = "world";
+            upper_pub.publish(empty_poly);
+            lower_pub.publish(empty_poly);
+        };
+
+        const auto& pipes = m_perception.getDetectedPipes();
+        if (not pipes.empty()){
+            publish_pipe_polygons(pipes[0], m_pub_first_gate_upper, m_pub_first_gate_lower);
+        } else {
+            publish_empty_polygons(m_pub_first_gate_upper, m_pub_first_gate_lower);
         }
-        {
-            auto &points = lower_poly_msg.polygon.points;
-            points.resize(4);
-            points[0].x = (*pipe).m_end;
-            points[0].y = (*pipe).m_gap_start;
-            points[1].x = (*pipe).m_start;
-            points[1].y = (*pipe).m_gap_start;
-            points[2].x = (*pipe).m_start;
-            points[2].y = *floor_offset;
-            points[3].x = (*pipe).m_end;
-            points[3].y = *floor_offset;
+        if (pipes.size() > 1){
+            publish_pipe_polygons(pipes[1], m_pub_second_gate_upper, m_pub_second_gate_lower);
+        } else {
+            publish_empty_polygons(m_pub_second_gate_upper, m_pub_second_gate_lower);
         }
     }
-    m_pub_gate_upper.publish(upper_poly_msg);
-    m_pub_gate_lower.publish(lower_poly_msg);
 
     auto point_cloud_msg = sensor_msgs::PointCloud{};
     point_cloud_msg.header.frame_id = "world";
@@ -193,11 +216,12 @@ void FlappyController::publishCommand(double delta_sec){
 
     auto path_msg = nav_msgs::Path{};
     path_msg.header.frame_id = "world";
-    auto pipe = m_perception.getFistPipe();
-    if (pipe.has_value()){
-        auto relative_pos = (*pipe).getRelativePosition(m_margin_x);
+    const auto& pipes = m_perception.getDetectedPipes();
+    if (not pipes.empty()){
+        const auto& pipe = pipes.front();
+        const auto relative_pos = pipe.getRelativePosition(m_margin_x);
         if (relative_pos != RelativePosition::After){
-            const auto median_y = ((*pipe).m_gap_start + (*pipe).m_gap_end)*0.5;
+            const auto median_y = (pipe.m_gap_start + pipe.m_gap_end)*0.5;
             const auto current_speed_norm = std::sqrt(pow2(m_current_speed.x) + pow2(m_current_speed.y));
             const auto p0 = Vector2d{
                 0.0,
@@ -209,9 +233,9 @@ void FlappyController::publishCommand(double delta_sec){
                     median_y
                 };
                 if (relative_pos == RelativePosition::Before) {
-                    res.x = (*pipe).m_start - m_margin_x;
-                } else if ((*pipe).isAlignedWithGap(m_margin_y)) {
-                    res.x = (*pipe).m_end + m_margin_x;
+                    res.x = pipe.m_start - m_margin_x;
+                } else if (pipe.isAlignedWithGap(m_margin_y)) {
+                    res.x = pipe.m_end + m_margin_x;
                 }
                 return res;
             }();
@@ -240,10 +264,9 @@ void FlappyController::publishCommand(double delta_sec){
                 point_msg.pose.position.y = p.y;
                 path_msg.poses.emplace_back(point_msg);
             }
-            point_msg.pose.position.x = (*pipe).m_end;
+            point_msg.pose.position.x = pipe.m_end;
             point_msg.pose.position.y = median_y;
             path_msg.poses.emplace_back(point_msg);
-
         }
     }
     m_pub_path.publish(path_msg);
@@ -268,16 +291,17 @@ Vector2d FlappyController::getTargetPos() const {
         0.0
     };
 
-    const auto pipe = m_perception.getFistPipe();
-    if (pipe.has_value()){
-        auto relative_pos = (*pipe).getRelativePosition(m_margin_x);
-        if ( relative_pos == RelativePosition::Before and not (*pipe).isAlignedWithGap(m_margin_y)){
-            res.x = std::min(res.x, (*pipe).m_start - m_margin_x);
+    const auto& pipes = m_perception.getDetectedPipes();
+    if (not pipes.empty()){
+        const auto& pipe = pipes.front();
+        auto relative_pos = pipe.getRelativePosition(m_margin_x);
+        if ( relative_pos == RelativePosition::Before and not pipe.isAlignedWithGap(m_margin_y)){
+            res.x = std::min(res.x, pipe.m_start - m_margin_x);
         }
         if (relative_pos != RelativePosition::After){
-            res.y = ((*pipe).m_gap_start + (*pipe).m_gap_end) * 0.5;
+            res.y = (pipe.m_gap_start + pipe.m_gap_end) * 0.5;
         }
-        if (relative_pos == RelativePosition::Inside and not (*pipe).isAlignedWithGap(m_margin_y)) {
+        if (relative_pos == RelativePosition::Inside and not pipe.isAlignedWithGap(m_margin_y)) {
             res.x = 0.0;
         }
     }

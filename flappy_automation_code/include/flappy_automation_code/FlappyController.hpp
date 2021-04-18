@@ -63,8 +63,10 @@ private:
     ros::Subscriber m_sub_laser_scan;
     ros::Publisher m_pub_acc_cmd;
     ros::Publisher m_pub_point_cloud;
-    ros::Publisher m_pub_gate_upper;
-    ros::Publisher m_pub_gate_lower;
+    ros::Publisher m_pub_first_gate_upper;
+    ros::Publisher m_pub_first_gate_lower;
+    ros::Publisher m_pub_second_gate_upper;
+    ros::Publisher m_pub_second_gate_lower;
     ros::Publisher m_pub_path;
     ros::NodeHandlePtr m_handle_ptr;
 

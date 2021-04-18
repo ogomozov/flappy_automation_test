@@ -61,6 +61,7 @@ enum struct RelativePosition{
 };
 
 struct Pipe{
+    Pipe() = default;
     Pipe(double start, double end, double gap_start, double gap_end) :
         m_start{start},
         m_end{end},
@@ -94,10 +95,10 @@ struct Pipe{
         return RelativePosition::Before;
     }
 
-    double m_start;
-    double m_end;
-    double m_gap_start;
-    double m_gap_end;
+    double m_start{0};
+    double m_end{0};
+    double m_gap_start{0};
+    double m_gap_end{0};
 };
 
 template<typename T>

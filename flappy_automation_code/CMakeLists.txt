@@ -26,7 +26,7 @@ add_executable(${PROJECT_NAME}_node
         src/SimplePerception.cpp
         src/FlappyController.cpp
         include/flappy_automation_code/Common.hpp
-        include/flappy_automation_code/SimplePerception.hpp)
+        include/flappy_automation_code/SimplePerception.hpp include/flappy_automation_code/Hermite3.hpp)
 
 target_link_libraries (${PROJECT_NAME}_node Eigen3::Eigen)
 

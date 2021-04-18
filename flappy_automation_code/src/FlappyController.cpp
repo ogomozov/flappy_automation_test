@@ -1,7 +1,8 @@
 #include <flappy_automation_code/FlappyController.hpp>
+#include <flappy_automation_code/Hermite3.hpp>
 #include <laser_geometry/laser_geometry.h>
 #include <geometry_msgs/PolygonStamped.h>
-
+#include <nav_msgs/Path.h>
 
 FlappyController::FlappyController(ros::NodeHandlePtr h) :
     m_sub_vel{
@@ -14,6 +15,7 @@ FlappyController::FlappyController(ros::NodeHandlePtr h) :
       h->advertise<sensor_msgs::PointCloud>("/flappy_point_cloud", 1)},
     m_pub_gate_upper{h->advertise<geometry_msgs::PolygonStamped>("/flappy_gate_upper", 1)},
     m_pub_gate_lower{h->advertise<geometry_msgs::PolygonStamped>("/flappy_gate_lower", 1)},
+    m_pub_path{h->advertise<nav_msgs::Path>("/flappy_path", 1)},
     m_perception{initParams()},
     m_handle_ptr{std::move(h)}
 {
@@ -188,7 +190,64 @@ void FlappyController::publishCommand(double delta_sec){
     acc_cmd.x = std::clamp(acc_cmd.x, -m_max_acc, m_max_acc);
     acc_cmd.y = std::clamp(acc_cmd.y, -m_max_acc, m_max_acc);
     m_pub_acc_cmd.publish(acc_cmd);
-    m_prev_acc = acc_cmd;
+
+    auto path_msg = nav_msgs::Path{};
+    path_msg.header.frame_id = "world";
+    auto pipe = m_perception.getFistPipe();
+    if (pipe.has_value()){
+        auto relative_pos = (*pipe).getRelativePosition(m_margin_x);
+        if (relative_pos != RelativePosition::After){
+            const auto median_y = ((*pipe).m_gap_start + (*pipe).m_gap_end)*0.5;
+            const auto current_speed_norm = std::sqrt(pow2(m_current_speed.x) + pow2(m_current_speed.y));
+            const auto p0 = Vector2d{
+                0.0,
+                0.0
+            };
+            const auto p1 = [&](){
+                auto res = Vector2d{
+                    0.0,
+                    median_y
+                };
+                if (relative_pos == RelativePosition::Before) {
+                    res.x = (*pipe).m_start - m_margin_x;
+                } else if ((*pipe).isAlignedWithGap(m_margin_y)) {
+                    res.x = (*pipe).m_end + m_margin_x;
+                }
+                return res;
+            }();
+            const auto d = p1 - p0;
+            const auto spline_length_est = sqrt(pow2(d.x) + pow2(d.y));
+            const auto v0 = Vector2d{
+                    m_current_speed.x / current_speed_norm * spline_length_est,
+                    m_current_speed.y / current_speed_norm * spline_length_est
+            };
+            const auto v1 = Vector2d{
+                m_max_speed * spline_length_est,
+                0.0
+            };
+            const auto spline = Hermite3{
+                p0,
+                p1,
+                v0,
+                v1
+            };
+
+            auto point_msg = geometry_msgs::PoseStamped{};
+            for (int i = 0; i < 10; ++i){
+                const auto s = 0.1 * i;
+                const auto p = spline.posAt(s);
+                point_msg.pose.position.x = p.x;
+                point_msg.pose.position.y = p.y;
+                path_msg.poses.emplace_back(point_msg);
+            }
+            point_msg.pose.position.x = (*pipe).m_end;
+            point_msg.pose.position.y = median_y;
+            path_msg.poses.emplace_back(point_msg);
+
+        }
+    }
+    m_pub_path.publish(path_msg);
+
 }
 
 constexpr NodeParams FlappyController::initParams(){
@@ -217,6 +276,9 @@ Vector2d FlappyController::getTargetPos() const {
         }
         if (relative_pos != RelativePosition::After){
             res.y = ((*pipe).m_gap_start + (*pipe).m_gap_end) * 0.5;
+        }
+        if (relative_pos == RelativePosition::Inside and not (*pipe).isAlignedWithGap(m_margin_y)) {
+            res.x = 0.0;
         }
     }
 

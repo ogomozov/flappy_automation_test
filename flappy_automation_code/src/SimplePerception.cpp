@@ -81,7 +81,7 @@ void SimplePerception::shift(const Vector2d& delta){
         p.y += delta.y;
     }
 
-    while((not m_points_x_sorted.empty() and m_points_x_sorted.front().x < -m_params.m_margin_x))
+    while((not m_points_x_sorted.empty() and m_points_x_sorted.front().x < - 2 * m_params.m_margin_x))
         m_points_x_sorted.pop_front();
 
     detectPipe();

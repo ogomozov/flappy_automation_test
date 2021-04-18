@@ -6,6 +6,31 @@ struct Vector2d{
     double y;
 };
 
+constexpr Vector2d operator+(const Vector2d& a, const Vector2d& b) {
+    return Vector2d{
+        a.x + b.x,
+        a.y + b.y
+    };
+}
+
+constexpr Vector2d operator-(const Vector2d& a, const Vector2d& b) {
+    return Vector2d{
+        a.x - b.x,
+        a.y - b.y
+    };
+}
+
+constexpr Vector2d operator*(double scalar, const Vector2d& vector) {
+    return Vector2d{
+            vector.x * scalar,
+            vector.y * scalar
+    };
+}
+
+constexpr Vector2d operator*(const Vector2d& vector, double scalar) {
+    return scalar * vector;
+}
+
 struct NodeParams{
     double m_dist_threshold;
     double m_slow_speed;
@@ -53,7 +78,7 @@ struct Pipe{
 
     bool isPassingPipe(double margin_x) const {
         assert(margin_x >= 0);
-        return m_start < -margin_x and m_end > margin_x;
+        return margin_x > m_start and -margin_x < m_end;
     }
 
     bool isCollidingWithPipe(const Vector2d& margins) const {

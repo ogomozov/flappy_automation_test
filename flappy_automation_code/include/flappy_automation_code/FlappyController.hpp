@@ -65,6 +65,7 @@ private:
     ros::Publisher m_pub_point_cloud;
     ros::Publisher m_pub_gate_upper;
     ros::Publisher m_pub_gate_lower;
+    ros::Publisher m_pub_path;
     ros::NodeHandlePtr m_handle_ptr;
 
     /* Timer to check the timeouts on speed and laser scan readings. */
@@ -79,10 +80,10 @@ private:
     static constexpr auto m_slow_speed = 0.5;
     static constexpr auto m_margin_y = 0.22;
     static constexpr auto m_margin_x = 0.3;
-    static constexpr auto m_nom_acc = 0.35;
-    static constexpr auto m_max_acc = 1.5;
+    static constexpr auto m_nom_acc = 2.5;
+    static constexpr auto m_max_acc = 3.0;
     static constexpr auto m_max_view_distance = 1.5;
-    static constexpr auto m_max_speed = 1.0;
+    static constexpr auto m_max_speed = 2.5;
 
     /*============== State variables ==============*/
     // State of the controller.
